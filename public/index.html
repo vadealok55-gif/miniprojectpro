@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>NexusGuard | Identity & Resource Orchestration</title>
+    <link href="https://fonts.googleapis.com" rel="preconnect"/>
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200..800&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet"/>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#197fe6",
+                        "primary-dark": "#1565c0",
+                        "background-light": "#f8fafc",
+                        "background-dark": "#0f172a",
+                        "surface-dark": "#1e293b",
+                        "surface-border": "#334155",
+                    },
+                    fontFamily: { 
+                        "display": ["Manrope", "sans-serif"],
+                        "mono": ["JetBrains Mono", "monospace"]
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.2s ease-out',
+                        'slide-up': 'slideUp 0.3s ease-out',
+                    }
+                },
+            },
+        }
+    </script>
+    <style>
+        body { font-family: 'Manrope', sans-serif; scroll-behavior: smooth; }
+        .hide { display: none !important; }
+        .active-nav { background: rgba(25, 127, 230, 0.1); color: #197fe6; border-left: 4px solid #197fe6; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+        .loader { border: 2px solid #f3f3f3; border-top: 2px solid #197fe6; border-radius: 50%; width: 16px; height: 16px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        /* Search Suggestions Style */
+        .search-suggestion-list { 
+            position: absolute; 
+            top: 100%; 
+            left: 0; 
+            right: 0; 
+            margin-top: 0.5rem; 
+            background: rgba(30, 41, 59, 0.9); 
+                        backdrop-filter: blur(12px);
+         border: 1px solid #334155;
+            border-radius: 1.5rem;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            z-index: 100;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 min-h-screen flex flex-col transition-colors duration-300">
+
+    <div id="toastContainer" class="fixed top-6 right-6 z-[600] flex flex-col gap-3"></div>
+
+    <!-- 1. ENTRY PORTAL -->
+    <section id="authSection" class="min-h-screen flex flex-col">
+        <header class="fixed top-0 w-full z-50 border-b border-slate-200 dark:border-surface-border bg-white/80 dark:bg-background-dark/80 backdrop-blur-md px-6 py-4">
+            <div class="max-w-7xl mx-auto flex items-center justify-between gap-8">
+                <!-- Branding -->
+                <div class="flex items-center gap-3 shrink-0">
+                    <div class="size-9 bg-primary/20 rounded-xl flex items-center justify-center text-primary border border-primary/20">
+                        <span class="material-symbols-outlined font-bold">security</span>
+                    </div>
+                    <h2 class="text-xl font-extrabold tracking-tight hidden sm:block">NexusGuard</h2>
+                </div>
+
+                <!-- NEW: Top Search Option -->
+                <div class="flex-1 max-w-lg relative group">
+                    <div class="relative">
+                        <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg group-focus-within:text-primary transition-colors">search</span>
+                        <input type="text" id="globalSearchInput" oninput="handleGlobalSearch(this.value)" placeholder="Search enterprises (e.g. Nexus Core)..." 
+                            class="w-full h-11 pl-12 pr-4 rounded-full border border-slate-200 dark:border-surface-border bg-white dark:bg-slate-900/50 focus:ring-2 focus:ring-primary outline-none transition-all text-sm font-medium"/>
+                    </div>
+                    <!-- Suggestions Dropdown -->
+                    <div id="searchSuggestions" class="hide search-suggestion-list animate-fade-in">
+                        <!-- Dynamic Content -->
+                    </div>
+                </div>
+                
+                <button onclick="toggleTheme()" class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-surface-dark transition-colors shrink-0">
+                    <span class="material-symbols-outlined">contrast</span>
+                </button>
+            </div>
+        </header>
+
+        <main class="flex-grow flex items-center justify-center p-4 relative pt-20">
+            <div class="w-full max-w-[800px] grid grid-cols-1 md:grid-cols-2 gap-8 animate-slide-up">
+                
+                <!-- CREATOR PATH -->
+                <div class="bg-white dark:bg-surface-dark p-10 rounded-[48px] shadow-2xl border border-slate-200 dark:border-surface-border space-y-6 flex flex-col h-full">
+                    <div class="size-16 rounded-3xl bg-primary/10 text-primary flex items-center justify-center">
+                        <span class="material-symbols-outlined text-4xl">add_business</span>
+                    </div>
+                    <div class="flex-1">
+                        <h2 class="text-2xl font-black tracking-tight">Create Enterprise</h2>
+                        <p class="text-sm text-slate-500 mt-2">Initialize a fresh node. Define your own roles and database from scratch.</p>
+                    </div>
+                    <button onclick="startOnboarding()" class="w-full h-14 bg-primary text-white font-black uppercase text-xs rounded-2xl shadow-xl shadow-primary/20 hover:bg-primary-dark transition-all">Start Scratch Org</button>
+                </div>
+
+                <!-- JOINER PATH -->
+                <div class="bg-white dark:bg-surface-dark p-10 rounded-[48px] shadow-2xl border border-slate-200 dark:border-surface-border space-y-6 flex flex-col h-full">
+                    <div class="size-16 rounded-3xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
+                        <span class="material-symbols-outlined text-4xl">fingerprint</span>
+                    </div>
+                    <div class="flex-1">
+                        <h2 class="text-2xl font-black tracking-tight">Join as Outsider</h2>
+                        <p class="text-sm text-slate-500 mt-2">Use the search bar above or enter a Unique EID to request access to an enterprise.</p>
+                    </div>
+                    <button onclick="showJoinModal()" class="w-full h-14 border-2 border-emerald-500/30 text-emerald-500 font-black uppercase text-xs rounded-2xl hover:bg-emerald-500/5 transition-all">Enter EID Manually</button>
+                </div>
+
+            </div>
+        </main>
+    </section>
+
+    <!-- 2. ONBOARDING (SCRATCH) -->
+    <section id="onboardingSection" class="hide min-h-screen flex items-center justify-center bg-background-light dark:bg-background-dark p-6">
+        <div class="w-full max-w-md bg-white dark:bg-surface-dark p-10 rounded-[40px] shadow-2xl border border-slate-200 dark:border-surface-border space-y-8 animate-slide-up">
+            <div class="text-center">
+                <h3 class="text-2xl font-black">Identity Orchestration</h3>
+                <p class="text-xs text-slate-500 mt-1">Deploying an empty organizational infrastructure.</p>
+            </div>
+            <div class="space-y-4">
+                <input type="text" id="newOrgName" placeholder="Organization Name" class="w-full h-12 px-4 rounded-xl border border-slate-200 dark:border-surface-border bg-transparent outline-none focus:ring-2 focus:ring-primary font-bold"/>
+                <div class="p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800">
+                    <p class="text-[9px] font-black text-slate-400 uppercase mb-1">Generated EID</p>
+                    <div class="flex items-center justify-between">
+                        <span id="genEid" class="font-mono font-bold text-primary tracking-widest uppercase">NX-####-X</span>
+                        <button onclick="regenerateEid()" class="material-symbols-outlined text-sm text-slate-400 hover:text-primary">refresh</button>
+                    </div>
+                </div>
+            </div>
+            <button onclick="finalizeScratchOrg()" class="w-full h-14 bg-primary text-white font-black uppercase text-xs rounded-2xl shadow-xl">Deploy Scratch Hub</button>
+            <button onclick="location.reload()" class="w-full text-[10px] font-bold text-slate-400 uppercase">Cancel</button>
+        </div>
+    </section>
+
+    <!-- 3. DASHBOARD -->
+    <section id="dashboardSection" class="hide flex h-screen overflow-hidden">
+        <aside id="sidebar" class="w-72 bg-white dark:bg-surface-dark border-r border-slate-200 dark:border-surface-border flex flex-col z-20">
+            <div class="p-8 border-b border-slate-100 dark:border-surface-border flex items-center gap-3">
+                <div id="sideIcon" class="size-10 bg-primary rounded-2xl flex items-center justify-center text-white shadow-xl">
+                    <span class="material-symbols-outlined">hub</span>
+                </div>
+                <div class="overflow-hidden">
+                    <h3 id="sidebarType" class="font-black text-[10px] uppercase text-primary">ADMIN CONSOLE</h3>
+                    <p id="sidebarOrg" class="text-xs font-bold truncate">Nexus Core</p>
+                </div>
+            </div>
+            <nav id="sidebarNav" class="flex-1 p-4 space-y-1 overflow-y-auto"></nav>
+            <div class="p-6 border-t border-slate-100 dark:border-surface-border">
+                <div class="flex items-center gap-3 mb-4 px-2">
+                    <div class="size-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-bold text-[10px]" id="userInitials">JD</div>
+                    <div class="overflow-hidden">
+                        <p class="text-[11px] font-bold truncate" id="userName">Jane Admin</p>
+                        <p class="text-[9px] text-slate-500 uppercase font-black" id="userRoleLabel">Super Admin</p>
+                    </div>
+                </div>
+                <button onclick="location.reload()" class="w-full py-3 bg-red-500/10 text-red-500 text-[10px] font-black uppercase rounded-xl hover:bg-red-500 hover:text-white transition-all">Disconnect</button>
+            </div>
+        </aside>
+
+        <main class="flex-1 flex flex-col overflow-hidden bg-background-light dark:bg-background-dark">
+            <header class="h-20 border-b border-slate-200 dark:border-surface-border bg-white/50 dark:bg-background-dark/50 backdrop-blur-md flex items-center justify-between px-8">
+                <div>
+                    <h1 id="viewTitle" class="text-xl font-extrabold tracking-tight">Dashboard</h1>
+                    <p id="viewSubtitle" class="text-xs text-slate-500">Node Status: Secure</p>
+                </div>
+                <div id="statusBadge" class="px-3 py-1.5 bg-emerald-500/10 text-emerald-500 rounded-full text-[9px] font-black uppercase tracking-widest">Handshake: OK</div>
+            </header>
+            <div id="viewContainer" class="flex-1 overflow-y-auto p-8 animate-fade-in"></div>
+        </main>
+    </section>
+
+    <!-- Modal -->
+    <div id="modalOverlay" class="hide fixed inset-0 bg-background-dark/80 backdrop-blur-sm z-[400] flex items-center justify-center p-6 animate-fade-in">
+        <div id="modalContent" class="bg-white dark:bg-surface-dark w-full max-w-lg rounded-[40px] border border-slate-200 dark:border-surface-border p-10 shadow-2xl animate-slide-up overflow-hidden"></div>
+    </div>
+
+    <!-- UI Logic & Virtual DB -->
+    <script>
+        const appDatabase = {
+            activeOrg: { name: 'Nexus Core Hub', eid: 'NX-8820-A', isPopulated: true },
+            currentUser: null,
+            users: [],
+            roles: {},
+            employees: [],
+            requests: [],
+            privilegePool: ['ADMIN', 'READ', 'WRITE', 'EXECUTE', 'BILLING', 'NETWORK', 'INFRASTRUCTURE'],
+            resources: [
+                { id: 'f1', name: 'Core Infrastructure Schema', type: 'Architecture', req: 'ADMIN', size: '2.4MB' },
+                { id: 'f2', name: 'Global Payroll 2025.csv', type: 'Financial', req: 'BILLING', size: '1.1MB' },
+                { id: 'f3', name: 'Quantum Key Distribution Code', type: 'System', req: 'EXECUTE', size: '14.8MB' },
+                { id: 'f4', name: 'Public Knowledge Base', type: 'Documentation', req: 'READ', size: '0.4MB' }
+            ]
+        };
+
+        // --- DATABASE INITIALIZERS ---
+        function initNexusCore() {
+            appDatabase.activeOrg = { name: 'Nexus Core Hub', eid: 'NX-8820-A', isPopulated: true };
+            appDatabase.roles = {
+                'Super Admin': ['ADMIN', 'READ', 'WRITE', 'EXECUTE', 'BILLING', 'NETWORK'],
+                'Manager': ['READ', 'WRITE', 'BILLING'],
+                'Developer': ['READ', 'EXECUTE', 'NETWORK'],
+                'Standard User': ['READ']
+            };
+            appDatabase.users = [{ id: 'u1', name: 'Jane Admin', email: 'admin@nexus.io', role: 'Super Admin', privs: appDatabase.roles['Super Admin'] }];
+            appDatabase.employees = [];
+            for(let i=1; i<=1000; i++) {
+                appDatabase.employees.push({ id: i, name: `Employee ${i}`, eid: `NX-${2000+i}`, role: 'Standard User', dept: 'Operations' });
+            }
+        }
+
+        function initScratchOrg(name, eid) {
+            appDatabase.activeOrg = { name, eid, isPopulated: false };
+            appDatabase.roles = { 'Owner': ['ADMIN', 'READ', 'WRITE', 'EXECUTE', 'BILLING', 'NETWORK', 'INFRASTRUCTURE'] };
+            appDatabase.users = [{ id: 'u-owner', name: 'Identity Owner', email: 'owner@nexus.io', role: 'Owner', privs: appDatabase.roles['Owner'] }];
+            appDatabase.employees = [];
+            appDatabase.requests = [];
+        }
+
+        // --- SEARCH LOGIC ---
+        function handleGlobalSearch(val) {
+            const suggestions = document.getElementById('searchSuggestions');
+            if (!val || val.length < 2) {
+                suggestions.classList.add('hide');
+                return;
+            }
+
+            const query = val.toLowerCase();
+            const results = [];
+            
+            // Recommend Nexus Core
+            if ("nexus core hub".includes(query) || "nx-8820-a".includes(query)) {
+                results.push({ name: 'Nexus Core Hub', eid: 'NX-8820-A', type: 'Public Instance', populated: true });
+            }
+
+            if (results.length > 0) {
+                suggestions.classList.remove('hide');
+                suggestions.innerHTML = results.map(res => `
+                    <button onclick="handleSearchClick('${res.eid}', '${res.name}')" class="w-full p-4 hover:bg-primary/10 flex items-center gap-4 text-left border-b border-slate-700 last:border-0 transition-colors">
+                        <div class="size-10 rounded-xl bg-indigo-500/20 text-indigo-500 flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-lg">hub</span></div>
+                        <div class="flex-1">
+                            <h4 class="text-sm font-bold text-slate-100">${res.name}</h4>
+                            <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest">EID: ${res.eid} • ${res.populated ? 'Populated' : 'Scratch'}</p>
+                        </div>
+                        <span class="material-symbols-outlined text-slate-500">login</span>
+                    </button>
+                `).join('');
+            } else {
+                suggestions.classList.remove('hide');
+                suggestions.innerHTML = `<div class="p-6 text-center text-slate-500 text-xs font-bold">No organizational node found.</div>`;
+            }
+        }
+
+        function handleSearchClick(eid, name) {
+            document.getElementById('searchSuggestions').classList.add('hide');
+            document.getElementById('globalSearchInput').value = name;
+            
+            if (eid === 'NX-8820-A') {
+                showToast('HANDSHAKE SUCCESSFUL: Joining Nexus Core...', 'success');
+                setTimeout(() => simulateLogin('Standard User', name, true), 800);
+            } else {
+                showJoinModal(eid);
+            }
+        }
+
+        // --- UI FLOW ---
+        function toggleTheme() { document.documentElement.classList.toggle('dark'); }
+        
+        function showToast(msg, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `${type === 'success' ? 'bg-emerald-500' : 'bg-primary'} text-white px-6 py-4 rounded-2xl text-[10px] font-black uppercase shadow-2xl animate-slide-up flex items-center gap-4`;
+            toast.innerHTML = `<span class="material-symbols-outlined text-lg">verified_user</span> ${msg}`;
+            container.appendChild(toast);
+            setTimeout(() => { toast.classList.add('opacity-0'); setTimeout(() => toast.remove(), 300); }, 3000);
+        }
+
+        function startOnboarding() {
+            document.getElementById('authSection').classList.add('hide');
+            document.getElementById('onboardingSection').classList.remove('hide');
+            regenerateEid();
+        }
+
+        function regenerateEid() {
+            const eid = 'NX-' + Math.floor(1000 + Math.random() * 9000) + '-' + String.fromCharCode(65 + Math.floor(Math.random() * 26));
+            document.getElementById('genEid').innerText = eid;
+        }
+
+        function finalizeScratchOrg() {
+            const name = document.getElementById('newOrgName').value;
+            if(!name) { showToast('Name Required', 'error'); return; }
+            initScratchOrg(name, document.getElementById('genEid').innerText);
+            simulateLogin('Super Admin', name, false);
+        }
+
+        function showJoinModal(prefill = '') {
+            const html = `
+                <h3 class="text-2xl font-black mb-2">Access Handshake</h3>
+                <p class="text-xs text-slate-500 mb-8 text-center px-6">Enter the Enterprise EID to request outsider access to the cluster.</p>
+                <input type="text" id="eidJoin" value="${prefill}" placeholder="NX-####-X" class="w-full h-12 px-4 rounded-xl border border-slate-200 dark:border-surface-border bg-transparent font-mono font-bold text-center outline-none focus:ring-2 focus:ring-emerald-500 tracking-widest uppercase mb-6"/>
+                <button onclick="submitJoinRequest()" class="w-full h-14 bg-emerald-500 text-white font-black uppercase text-[10px] rounded-2xl shadow-xl">Request Member Status</button>
+            `;
+            const overlay = document.getElementById('modalOverlay');
+            document.getElementById('modalContent').innerHTML = html;
+            overlay.classList.remove('hide');
+        }
+
+        function submitJoinRequest() {
+            const val = document.getElementById('eidJoin').value;
+            if(val === 'NX-8820-A') {
+                showToast('Authorized: Entering Nexus Core Hub...', 'success');
+                setTimeout(() => { closeModal(); simulateLogin('Standard User', 'Nexus Core Hub', true); }, 800);
+            } else {
+                showToast('Request sent to Enterprise Admin.', 'info');
+                closeModal();
+            }
+        }
+
+        function simulateLogin(roleName, orgName, isNexusCore = false) {
+            if(isNexusCore) initNexusCore();
+            appDatabase.currentUser = (roleName === 'Super Admin' || roleName === 'Owner') 
+                ? appDatabase.users[0] 
+                : { name: 'Member Node 101', role: 'Standard User', privs: ['READ'] };
+
+            document.getElementById('authSection').classList.add('hide');
+            document.getElementById('onboardingSection').classList.add('hide');
+            document.getElementById('dashboardSection').classList.remove('hide');
+            
+            document.getElementById('sidebarOrg').innerText = orgName;
+            document.getElementById('userName').innerText = appDatabase.currentUser.name;
+            document.getElementById('userRoleLabel').innerText = appDatabase.currentUser.role;
+            document.getElementById('userInitials').innerText = appDatabase.currentUser.name[0];
+
+            const isAdmin = roleName === 'Super Admin' || roleName === 'Owner';
+            renderSidebar(isAdmin);
+            navigateTo(isAdmin ? 'access' : 'resources');
+        }
+
+        function renderSidebar(isAdmin) {
+            const nav = document.getElementById('sidebarNav');
+            document.getElementById('sidebarType').innerText = isAdmin ? 'ADMIN CONSOLE' : 'IDENTITY NODE';
+            document.getElementById('sideIcon').className = `size-10 rounded-2xl flex items-center justify-center text-white shadow-xl ${isAdmin ? 'bg-primary' : 'bg-emerald-500'}`;
+            
+            let html = '';
+            if (isAdmin) {
+                html += createNavBtn('access', 'group', 'Access Control');
+                html += createNavBtn('roles', 'settings_suggest', 'Role Designer');
+                html += createNavBtn('database', 'database', `Global DB (${appDatabase.employees.length})`);
+                html += createNavBtn('requests', 'pending_actions', 'Approvals', appDatabase.requests.length);
+            } else {
+                html += createNavBtn('my-keys', 'vpn_key', 'Identity Keys');
+                html += createNavBtn('resources', 'folder_special', 'Resource Hub');
+            }
+            nav.innerHTML = html;
+        }
+
+        function createNavBtn(id, icon, label, badge = 0) {
+            return `<button onclick="navigateTo('${id}')" id="nav-${id}" class="w-full flex items-center justify-between gap-3 px-4 py-3.5 rounded-2xl text-xs font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">
+                <div class="flex items-center gap-3"><span class="material-symbols-outlined text-lg">${icon}</span> ${label}</div>
+                ${badge > 0 ? `<span class="size-5 rounded-full bg-orange-500 text-white text-[9px] flex items-center justify-center font-black animate-pulse">${badge}</span>` : ''}
+            </button>`;
+        }
+
+        function navigateTo(viewId) {
+            const container = document.getElementById('viewContainer');
+            const title = document.getElementById('viewTitle');
+            const sub = document.getElementById('viewSubtitle');
+            document.querySelectorAll('#sidebarNav button').forEach(btn => btn.classList.remove('active-nav'));
+            const activeNav = document.getElementById(`nav-${viewId}`);
+            if (activeNav) activeNav.classList.add('active-nav');
+            container.innerHTML = '';
+
+            switch(viewId) {
+                case 'access': title.innerText = 'Access Control'; sub.innerText = 'Managing identity clearance.'; renderAdminAccess(container); break;
+                case 'database': title.innerText = 'Infrastructure DB'; sub.innerText = 'Indexed identity nodes.'; renderAdminDB(container); break;
+                case 'roles': title.innerText = 'Role Designer'; sub.innerText = 'Policy builder.'; renderAdminRoles(container); break;
+                case 'requests': title.innerText = 'Approvals'; sub.innerText = 'Outsider access queue.'; renderRequests(container); break;
+                case 'resources': title.innerText = 'Resource Hub'; sub.innerText = 'Authorized file system.'; renderResources(container); break;
+                case 'my-keys': title.innerText = 'Identity Node'; sub.innerText = 'Security clearance credentials.'; renderMemberKeys(container); break;
+            }
+        }
+
+        // --- VIEWS ---
+        function renderAdminAccess(container) {
+            container.innerHTML = `<div class="bg-white dark:bg-surface-dark rounded-[40px] border border-slate-200 dark:border-surface-border shadow-2xl overflow-hidden animate-fade-in">
+                <table class="w-full text-left">
+                    <thead class="bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-surface-border text-[10px] font-black uppercase text-slate-400"><th class="p-6">Identity</th><th class="p-6">Role</th><th class="p-6 text-right">Clearance</th></thead>
+                    <tbody>${appDatabase.users.map(u => `<tr class="border-b border-slate-100 dark:border-surface-border/50"><td class="p-6 font-bold text-sm">${u.name}</td><td class="p-6"><span class="px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 text-[8px] font-black uppercase">${u.role}</span></td><td class="p-6 text-right font-mono text-[9px] text-primary">${u.privs.join(', ')}</td></tr>`).join('')}</tbody>
+                </table>
+            </div>`;
+        }
+
+        function renderAdminDB(container) {
+            const count = appDatabase.employees.length;
+            container.innerHTML = `<div class="space-y-6 animate-fade-in">
+                <div class="p-8 bg-slate-900 rounded-[40px] border border-slate-800 flex items-center justify-between">
+                    <div><h3 class="text-emerald-500 font-mono text-xl font-bold">> Nodes Indexed: ${count}</h3><p class="text-xs text-slate-500 mt-1">Live telemetry active.</p></div>
+                    <span class="material-symbols-outlined text-4xl text-slate-700">storage</span>
+                </div>
+                ${count > 0 ? `<div class="bg-white dark:bg-surface-dark rounded-[40px] border border-slate-200 dark:border-surface-border h-[400px] overflow-y-auto custom-scrollbar">
+                    <table class="w-full text-left">
+                        <thead class="sticky top-0 bg-white dark:bg-slate-900 text-[10px] font-black uppercase text-slate-400 border-b border-slate-200 dark:border-surface-border"><th class="p-6">EID</th><th class="p-6">Name</th><th class="p-6">Dept</th></thead>
+                        <tbody>${appDatabase.employees.slice(0, 100).map(e => `<tr class="border-b border-slate-100 dark:border-surface-border/50"><td class="p-6 font-mono text-xs text-primary">${e.eid}</td><td class="p-6 font-bold text-sm">${e.name}</td><td class="p-6 text-[9px] font-black uppercase text-slate-500">${e.dept}</td></tr>`).join('')}</tbody>
+                    </table>
+                </div>` : '<div class="p-20 text-center opacity-30 font-black uppercase tracking-widest">Database Scratch Instance</div>'}
+            </div>`;
+        }
+
+        function renderAdminRoles(container) {
+            container.innerHTML = `<div class="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in">
+                <div class="lg:col-span-1 bg-white dark:bg-surface-dark p-8 rounded-[40px] border border-slate-200 dark:border-surface-border shadow-xl space-y-6 h-fit">
+                    <h3 class="text-xl font-black">Role Designer</h3>
+                    <input type="text" id="roleIn" placeholder="New Role Name" class="w-full h-12 px-4 rounded-xl border border-slate-200 dark:border-surface-border bg-transparent font-bold outline-none focus:ring-2 focus:ring-primary"/>
+                    <div class="space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                        ${appDatabase.privilegePool.map(p => `<label class="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-900 rounded-xl cursor-pointer hover:border-primary border border-transparent transition-all"><input type="checkbox" name="roleP" value="${p}" class="rounded text-primary"/><span class="text-[10px] font-bold">${p}</span></label>`).join('')}
+                    </div>
+                    <button onclick="saveCustomRole()" class="w-full h-12 bg-primary text-white font-black uppercase text-[10px] rounded-xl">Commit Policy</button>
+                </div>
+                <div class="lg:col-span-2 space-y-4">
+                    <h3 class="text-xl font-black px-2">Active Roles</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">${Object.entries(appDatabase.roles).map(([name, privs]) => `<div class="p-6 bg-white dark:bg-surface-dark rounded-3xl border border-slate-200 dark:border-surface-border"><h4 class="font-black">${name}</h4><div class="flex flex-wrap gap-1 mt-3">${privs.map(p => `<span class="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[8px] font-black text-slate-400 uppercase">${p}</span>`).join('')}</div></div>`).join('')}</div>
+                </div>
+            </div>`;
+        }
+
+        function saveCustomRole() {
+            const name = document.getElementById('roleIn').value;
+            const checked = Array.from(document.querySelectorAll('input[name="roleP"]:checked')).map(i => i.value);
+            if(!name || checked.length === 0) { showToast('Incomplete Data', 'error'); return; }
+            appDatabase.roles[name] = checked;
+            showToast(`Role '${name}' active.`);
+            navigateTo('roles');
+        }
+
+        function renderRequests(container) {
+            container.innerHTML = `<div class="p-20 text-center opacity-30 font-black uppercase tracking-widest">Request Pipeline Stable</div>`;
+        }
+
+        function renderResources(container) {
+            const userPrivs = appDatabase.currentUser.privs;
+            const filtered = appDatabase.resources.filter(f => userPrivs.includes(f.req) || userPrivs.includes('ADMIN'));
+            container.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">${filtered.map(f => `
+                <div class="p-6 bg-white dark:bg-surface-dark rounded-[32px] border border-slate-200 dark:border-surface-border relative overflow-hidden group">
+                    <div class="size-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-4"><span class="material-symbols-outlined">description</span></div>
+                    <h4 class="font-bold text-sm">${f.name}</h4>
+                    <div class="mt-4 flex justify-between text-[9px] font-black uppercase tracking-widest text-slate-400"><span>${f.type}</span><span>${f.size}</span></div>
+                    <div class="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800"><span class="text-[8px] font-black uppercase text-emerald-500">Authorized Access</span></div>
+                </div>`).join('')}</div>`;
+        }
+
+        function renderMemberKeys(container) {
+            container.innerHTML = `<div class="max-w-xl mx-auto bg-white dark:bg-surface-dark p-10 rounded-[40px] border border-slate-200 dark:border-surface-border text-center space-y-8 animate-slide-up"><div class="size-20 bg-emerald-500/10 text-emerald-500 flex items-center justify-center rounded-full mx-auto"><span class="material-symbols-outlined text-4xl">verified</span></div><h3 class="text-3xl font-black">${appDatabase.currentUser.name}</h3><div class="p-8 bg-slate-50 dark:bg-slate-900 rounded-3xl font-mono text-primary font-bold text-xs tracking-widest break-all">NX-HANDSHAKE-${Math.random().toString(36).substring(7).toUpperCase()}</div><div class="flex flex-wrap gap-2 justify-center">${appDatabase.currentUser.privs.map(p => `<span class="px-3 py-1 bg-primary/10 text-primary text-[8px] font-black rounded-lg">${p} Access</span>`).join('')}</div></div>`;
+        }
+
+        function closeModal() { document.getElementById('modalOverlay').classList.add('hide'); }
+
+    </script>
+</body>
+</html>
+
+
+
