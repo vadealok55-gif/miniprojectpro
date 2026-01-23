@@ -10,7 +10,18 @@
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet"/>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <script>
+        // Fix for Trusted Types error
+        if (window.trustedTypes && window.trustedTypes.createPolicy) {
+            window.trustedTypes.createPolicy('default', {
+                createHTML: (string, sink) => string
+            });
+        }
+
         tailwind.config = {
             darkMode: "class",
             theme: {
@@ -158,6 +169,13 @@
                     <h1 id="viewTitle" class="text-xl font-extrabold tracking-tight">Dashboard</h1>
                     <p id="viewSubtitle" class="text-xs text-slate-500">Node Status: Secure</p>
                 </div>
+
+                <div class="flex-1 max-w-md mx-8 relative group hidden md:block">
+                    <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg">search</span>
+                    <input type="text" oninput="handleDashboardSearch(this.value)" placeholder="Search resources, users, data..." class="w-full h-10 pl-10 pr-4 rounded-xl border border-slate-200 dark:border-surface-border bg-slate-50 dark:bg-slate-900/50 text-xs font-bold focus:ring-2 focus:ring-primary outline-none transition-all"/>
+                    <div id="dashSearchSuggestions" class="hide absolute top-full left-0 right-0 mt-2 bg-white dark:bg-surface-dark border border-slate-200 dark:border-surface-border rounded-xl shadow-2xl overflow-hidden z-50"></div>
+                </div>
+
                 <div id="statusBadge" class="px-3 py-1.5 bg-emerald-500/10 text-emerald-500 rounded-full text-[9px] font-black uppercase tracking-widest">Handshake: OK</div>
             </header>
             <div id="viewContainer" class="flex-1 overflow-y-auto p-8 animate-fade-in"></div>
@@ -169,30 +187,77 @@
         <div id="modalContent" class="bg-white dark:bg-surface-dark w-full max-w-lg rounded-[40px] border border-slate-200 dark:border-surface-border p-10 shadow-2xl animate-slide-up overflow-hidden"></div>
     </div>
 
+    <!-- Login Modal Template -->
+    <template id="loginTemplate">
+        <div class="text-center space-y-8">
+            <div class="size-20 bg-primary/10 text-primary flex items-center justify-center rounded-3xl mx-auto">
+                <span class="material-symbols-outlined text-4xl">lock_person</span>
+            </div>
+            <div>
+                <h3 class="text-3xl font-black dark:text-white">Authentication</h3>
+                <p class="text-slate-500 mt-2 text-sm">Verify identity to access secure nodes.</p>
+            </div>
+            <div class="space-y-4">
+                <button onclick="handleLogin('google')" class="w-full h-14 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-white font-bold text-xs uppercase rounded-2xl shadow-lg flex items-center justify-center gap-3 transition-all">
+                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="size-5" alt="G"/>
+                    Continue with Google
+                </button>
+                <button onclick="handleLogin('github')" class="w-full h-14 bg-[#24292e] text-white hover:bg-[#2f363d] font-bold text-xs uppercase rounded-2xl shadow-lg flex items-center justify-center gap-3 transition-all">
+                    <svg height="20" viewBox="0 0 16 16" width="20" class="fill-current"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
+                    Continue with GitHub
+                </button>
+            </div>
+            <button onclick="closeModal()" class="text-[10px] font-bold text-slate-400 uppercase hover:text-slate-600 dark:hover:text-slate-200">Cancel</button>
+        </div>
+    </template>
+
     <!-- Logic Engine -->
     <script>
+        // --- FIREBASE CONFIGURATION (STEP 1: REPLACE THIS) ---
+        const firebaseConfig = {
+  apiKey: "AIzaSyA8riWFKSs7QpUW2ZLnoOfir4cLP9WIpAg",
+  authDomain: "nexussguard.firebaseapp.com",
+  projectId: "nexussguard",
+  storageBucket: "nexussguard.firebasestorage.app",
+  messagingSenderId: "800017047757",
+  appId: "1:800017047757:web:0d2f5b5b46edf260b84984",
+  measurementId: "G-M418FGD3JE"
+};
+
+        // Initialize Firebase
+        let auth, db;
+        try {
+            if(Object.keys(firebaseConfig).length > 0) {
+                firebase.initializeApp(firebaseConfig);
+                auth = firebase.auth();
+                db = firebase.firestore();
+                console.log("Firebase Initialized");
+            } else {
+                console.warn("Firebase Config missing - Falling back to local simulation mode");
+            }
+        } catch(e) { console.error("Firebase Init Error:", e); }
+
         const appDatabase = {
-            activeOrg: null,
             currentUser: null,
-            users: [],
+            activeOrg: null,
             roles: {},
+            users: [],
             employees: [],
-            requests: [],
-            privilegePool: ['ADMIN', 'READ', 'WRITE', 'EXECUTE', 'BILLING', 'NETWORK', 'INFRASTRUCTURE', 'DATABASE_MANAGE'],
-            
-            // NEW: Infrastructure Storage
-            infrastructure: {
-                folders: [],
-                databases: []
-            },
-            
-            resources: [
-                { id: 'f1', name: 'Core Infrastructure Schema', type: 'Architecture', req: 'INFRASTRUCTURE', size: '2.4MB' },
-                { id: 'f2', name: 'Global Payroll 2025.csv', type: 'Financial', req: 'BILLING', size: '1.1MB' },
-                { id: 'f3', name: 'Quantum Key Distribution Code', type: 'System', req: 'EXECUTE', size: '14.8MB' },
-                { id: 'f4', name: 'Public Knowledge Base', type: 'Documentation', req: 'READ', size: '0.4MB' }
+            infrastructure: { folders: [], databases: [] },
+            privilegePool: ['READ', 'WRITE', 'EXECUTE', 'DELETE', 'ADMIN', 'AUDIT', 'BILLING', 'NETWORK', 'INFRASTRUCTURE', 'DATABASE_MANAGE', 'AI_TRAIN'],
+            requests: [
+                { id: 'r1', name: 'Identity_992', requester: 'Bob Smith', status: 'PENDING', date: '2025-12-01' },
+                { id: 'r2', name: 'Node_Access_X', requester: 'Alice Jones', status: 'PENDING', date: '2025-12-02' }
             ]
         };
+
+        const publicDirectory = [
+            { name: 'Nexus Core Hub', eid: 'NX-8820-A' },
+            { name: 'Cyberdyne Systems', eid: 'NX-9910-C' },
+            { name: 'Tyrell Corp', eid: 'NX-2049-T' },
+            { name: 'Wayne Enterprises', eid: 'NX-1000-W' },
+            { name: 'Massive Dynamic', eid: 'NX-4242-M' }
+        ];
 
         // --- DATABASE INITIALIZERS ---
         function initNexusCore() {
@@ -236,12 +301,13 @@
             const suggestions = document.getElementById('searchSuggestions');
             if (!val || val.length < 2) { suggestions.classList.add('hide'); return; }
             const query = val.toLowerCase();
-            const results = [];
-            if ("nexus core hub".includes(query) || "nx-8820-a".includes(query)) {
-                results.push({ name: 'Nexus Core Hub', eid: 'NX-8820-A' });
-            }
+            
+            const results = publicDirectory.filter(org => 
+                org.name.toLowerCase().includes(query) || org.eid.toLowerCase().includes(query)
+            );
+
+            suggestions.classList.remove('hide');
             if (results.length > 0) {
-                suggestions.classList.remove('hide');
                 suggestions.innerHTML = results.map(res => `
                     <button onclick="handleSearchClick('${res.eid}', '${res.name}')" class="w-full p-4 hover:bg-primary/5 flex items-center gap-4 text-left border-b border-slate-100 dark:border-slate-700 last:border-0 transition-all">
                         <div class="size-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0"><span class="material-symbols-outlined">hub</span></div>
@@ -250,16 +316,64 @@
                             <p class="text-[9px] font-black text-slate-400 uppercase">EID: ${res.eid}</p>
                         </div>
                     </button>`).join('');
-            } else { suggestions.classList.add('hide'); }
+            } else {
+                 suggestions.innerHTML = `
+                    <div class="p-6 text-center space-y-2">
+                        <span class="material-symbols-outlined text-slate-300 text-3xl">domain_disabled</span>
+                        <p class="text-xs text-slate-500">No matching enterprise found.</p>
+                        <button onclick="startOnboarding()" class="text-primary text-[10px] font-black uppercase hover:underline">Deploy New Node</button>
+                    </div>
+                 `;
+            }
+        }
+
+        function handleDashboardSearch(val) {
+            const container = document.getElementById('dashSearchSuggestions');
+            if(!val || val.length < 2) { container.classList.add('hide'); return; }
+            const q = val.toLowerCase();
+            
+            const results = [];
+            // Search folders
+            appDatabase.infrastructure.folders.forEach(f => {
+                if(f.name.toLowerCase().includes(q)) results.push({ type: 'folder', name: f.name, sub: 'Directory', icon: 'folder', action: `showToast('Locating ${f.name}...', 'info')` });
+            });
+            // Search users
+            appDatabase.users.forEach(u => {
+                if(u.name.toLowerCase().includes(q)) results.push({ type: 'person', name: u.name, sub: u.role, icon: 'person', action: `showToast('User: ${u.name}', 'info')` });
+            });
+            // Search databases
+            appDatabase.infrastructure.databases.forEach(d => {
+                if(d.name.toLowerCase().includes(q)) results.push({ type: 'database', name: d.name, sub: d.type, icon: 'database', action: `showToast('DB Instance: ${d.name}', 'info')` });
+            });
+
+            container.classList.remove('hide');
+            if(results.length > 0) {
+                container.innerHTML = results.map(res => `
+                    <button onclick="${res.action}; document.getElementById('dashSearchSuggestions').classList.add('hide')" class="w-full p-3 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-3 text-left border-b border-slate-100 dark:border-slate-700 last:border-0 transition-all">
+                        <div class="size-8 rounded-lg bg-indigo-500/10 text-indigo-500 flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-sm">${res.icon}</span></div>
+                        <div class="flex-1">
+                            <h4 class="text-xs font-bold dark:text-white">${res.name}</h4>
+                            <p class="text-[8px] font-black text-slate-400 uppercase">${res.sub}</p>
+                        </div>
+                    </button>
+                `).join('');
+            } else {
+                container.innerHTML = `<div class="p-4 text-center text-[10px] text-slate-400 font-bold uppercase">No resources found</div>`;
+            }
         }
 
         function handleSearchClick(eid, name) {
             document.getElementById('searchSuggestions').classList.add('hide');
-            showJoinModal(eid);
+            checkAuth('join'); 
+            setTimeout(() => {
+                const input = document.getElementById('eidJoin');
+                if(input) input.value = eid;
+            }, 500);
         }
 
         // --- UI FLOW ---
         function toggleTheme() { document.documentElement.classList.toggle('dark'); }
+        function toggleSidebar() { document.getElementById('sidebar').classList.toggle('-translate-x-full'); }
         function showToast(msg, type = 'success') {
             const container = document.getElementById('toastContainer');
             const toast = document.createElement('div');
@@ -290,10 +404,24 @@
 
         function submitJoinRequest() {
             const val = document.getElementById('eidJoin').value;
-            if(val === 'NX-8820-A') {
-                showToast('Entering Nexus Core...', 'success');
-                setTimeout(() => { closeModal(); simulateLogin('Standard User', 'Nexus Core Hub', true); }, 800);
-            } else { showToast('Request Sent', 'info'); closeModal(); }
+            const knownOrgs = {
+                'NX-8820-A': 'Nexus Core Hub',
+                'NX-1024-S': 'Stark Industries',
+                'NX-1939-W': 'Wayne Enterprises',
+                'NX-2029-C': 'Cyberdyne Systems',
+                'NX-1968-U': 'Umbrella Corp'
+            };
+
+            if(knownOrgs[val]) {
+                showToast(`Entering ${knownOrgs[val]}...`, 'success');
+                setTimeout(() => { 
+                    closeModal(); 
+                    if(val === 'NX-8820-A') initNexusCore();
+                    else initScratchOrg(knownOrgs[val], val); // Treat others as scratch for demo
+                    
+                    simulateLogin(val === 'NX-8820-A' ? 'Standard User' : 'Owner', knownOrgs[val], val === 'NX-8820-A'); 
+                }, 800);
+            } else { showToast('Request Sent (Pending Approval)', 'info'); closeModal(); }
         }
 
         function simulateLogin(roleName, orgName, isNexusCore = false) {
@@ -539,7 +667,35 @@
         }
         function saveCustomRole() { const name = document.getElementById('roleIn').value; const checked = Array.from(document.querySelectorAll('input[name="roleP"]:checked')).map(i => i.value); if(!name || checked.length === 0) return; appDatabase.roles[name] = checked; navigateTo('roles'); showToast(`Role '${name}' active.`); }
         function editRole(name) { document.getElementById('roleIn').value = name; const privs = appDatabase.roles[name]; document.querySelectorAll('input[name="roleP"]').forEach(input => input.checked = privs.includes(input.value)); showToast(`Loading policy: ${name}`, 'info'); }
-        function renderRequests(container) { container.innerHTML = `<div class="p-20 text-center opacity-30 font-black uppercase tracking-widest">Pipeline Stable</div>`; }
+        function renderRequests(container) { 
+            if(appDatabase.requests.length === 0) {
+                container.innerHTML = `<div class="p-20 text-center opacity-30 font-black uppercase tracking-widest">Pipeline Stable</div>`;
+                return;
+            }
+            container.innerHTML = `
+                <div class="space-y-4 animate-fade-in">
+                    ${appDatabase.requests.map(req => `
+                        <div class="p-8 bg-white dark:bg-surface-dark rounded-[40px] border border-orange-500/20 shadow-xl flex flex-wrap gap-4 items-center justify-between">
+                            <div>
+                                <h4 class="font-black text-lg">${req.name}</h4>
+                                <p class="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Requester: ${req.requester} • ${req.date}</p>
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="handleRequest('${req.id}', 'deny')" class="px-6 py-3 bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-red-500 text-[10px] font-black uppercase rounded-2xl transition-all">Deny</button>
+                                <button onclick="handleRequest('${req.id}', 'approve')" class="px-8 py-3 bg-orange-500 text-white text-[10px] font-black uppercase rounded-2xl shadow-lg shadow-orange-500/20 hover:bg-orange-600 transition-all">Approve</button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        function handleRequest(id, action) {
+             appDatabase.requests = appDatabase.requests.filter(r => r.id !== id);
+             renderSidebar(true); // Update badge
+             navigateTo('requests');
+             showToast(`Request ${action === 'approve' ? 'Approved' : 'Denied'}`, action === 'approve' ? 'success' : 'info');
+        }
         function renderMemberKeys(container) { container.innerHTML = `<div class="max-w-xl mx-auto bg-white dark:bg-surface-dark p-10 rounded-[40px] border border-slate-200 dark:border-surface-border text-center space-y-8 animate-slide-up"><div class="size-20 bg-emerald-500/10 text-emerald-500 flex items-center justify-center rounded-full mx-auto"><span class="material-symbols-outlined text-4xl">verified</span></div><h3 class="text-3xl font-black">${appDatabase.currentUser.name}</h3><div class="p-8 bg-slate-50 dark:bg-slate-900 rounded-3xl font-mono text-primary font-bold text-xs tracking-widest break-all uppercase">NX-NODE-${Math.random().toString(36).substring(7).toUpperCase()}</div><div class="flex flex-wrap gap-2 justify-center">${appDatabase.currentUser.privs.map(p => `<span class="px-3 py-1 bg-primary/10 text-primary text-[8px] font-black rounded-lg">${p} Access</span>`).join('')}</div></div>`; }
         function closeModal() { document.getElementById('modalOverlay').classList.add('hide'); }
 
