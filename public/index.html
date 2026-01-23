@@ -364,11 +364,7 @@
 
         function handleSearchClick(eid, name) {
             document.getElementById('searchSuggestions').classList.add('hide');
-            checkAuth('join'); 
-            setTimeout(() => {
-                const input = document.getElementById('eidJoin');
-                if(input) input.value = eid;
-            }, 500);
+            showJoinModal(eid);
         }
 
         // --- UI FLOW ---
@@ -422,6 +418,17 @@
                     simulateLogin(val === 'NX-8820-A' ? 'Standard User' : 'Owner', knownOrgs[val], val === 'NX-8820-A'); 
                 }, 800);
             } else { showToast('Request Sent (Pending Approval)', 'info'); closeModal(); }
+        }
+
+        // --- AUTH & NAVIGATION ---
+        function checkAuth() {
+            // Stub for future auth check
+            return appDatabase.currentUser !== null;
+        }
+
+        function handleLogin() {
+             // Redirect to simulated login for demo
+             simulateLogin('Standard User', 'Nexus Core Hub', true);
         }
 
         function simulateLogin(roleName, orgName, isNexusCore = false) {
@@ -691,11 +698,50 @@
         }
 
         function handleRequest(id, action) {
-             appDatabase.requests = appDatabase.requests.filter(r => r.id !== id);
-             renderSidebar(true); // Update badge
-             navigateTo('requests');
-             showToast(`Request ${action === 'approve' ? 'Approved' : 'Denied'}`, action === 'approve' ? 'success' : 'info');
+             if (action === 'approve') {
+                 showProvisionModal(id);
+             } else {
+                 appDatabase.requests = appDatabase.requests.filter(r => r.id !== id);
+                 renderSidebar(true);
+                 navigateTo('requests');
+                 showToast('Request Denied', 'info');
+             }
         }
+
+        function showProvisionModal(reqId) {
+            const req = appDatabase.requests.find(r => r.id === reqId);
+            if(!req) return;
+            const roleOptions = Object.keys(appDatabase.roles).map(r => `<option value="${r}">${r}</option>`).join('');
+            
+            const html = `
+                <h3 class="text-2xl font-black mb-6">Provision Identity</h3>
+                <p class="text-sm text-slate-500 mb-6">Establishing handshake for <b>${req.name}</b></p>
+                <div class="space-y-6">
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black uppercase text-slate-400 ml-1">Assign Role</label>
+                        <select id="provRole" class="w-full h-12 px-4 rounded-xl border border-slate-200 dark:border-surface-border bg-transparent font-bold outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white">
+                            ${roleOptions}
+                        </select>
+                    </div>
+                    <button onclick="confirmProvision('${reqId}')" class="w-full h-14 bg-emerald-500 text-white font-black uppercase text-[10px] rounded-2xl shadow-xl">Authorize Node</button>
+                </div>`;
+            document.getElementById('modalContent').innerHTML = html;
+            document.getElementById('modalOverlay').classList.remove('hide');
+        }
+
+        function confirmProvision(reqId) {
+            const req = appDatabase.requests.find(r => r.id === reqId);
+            const role = document.getElementById('provRole').value;
+            if(req && role) {
+                appDatabase.users.push({ id: req.requester, name: req.name, role: role, privs: appDatabase.roles[role] });
+                appDatabase.requests = appDatabase.requests.filter(r => r.id !== reqId);
+                closeModal();
+                renderSidebar(true);
+                navigateTo('access'); // Go to access view to see new user
+                showToast(`Node ${req.name} provisioned as ${role}`, 'success');
+            }
+        }
+
         function renderMemberKeys(container) { container.innerHTML = `<div class="max-w-xl mx-auto bg-white dark:bg-surface-dark p-10 rounded-[40px] border border-slate-200 dark:border-surface-border text-center space-y-8 animate-slide-up"><div class="size-20 bg-emerald-500/10 text-emerald-500 flex items-center justify-center rounded-full mx-auto"><span class="material-symbols-outlined text-4xl">verified</span></div><h3 class="text-3xl font-black">${appDatabase.currentUser.name}</h3><div class="p-8 bg-slate-50 dark:bg-slate-900 rounded-3xl font-mono text-primary font-bold text-xs tracking-widest break-all uppercase">NX-NODE-${Math.random().toString(36).substring(7).toUpperCase()}</div><div class="flex flex-wrap gap-2 justify-center">${appDatabase.currentUser.privs.map(p => `<span class="px-3 py-1 bg-primary/10 text-primary text-[8px] font-black rounded-lg">${p} Access</span>`).join('')}</div></div>`; }
         function closeModal() { document.getElementById('modalOverlay').classList.add('hide'); }
 

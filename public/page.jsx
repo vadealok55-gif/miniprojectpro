@@ -287,6 +287,35 @@ function LandingPage({ allOrgs, onJoin, onCreate, toggleTheme }) {
     return found;
   }, [searchQuery, allOrgs]);
 
+  const [dashQuery, setDashQuery] = useState('');
+  const [dashResults, setDashResults] = useState([]);
+
+  useEffect(() => {
+    if (dashQuery.length < 2) {
+      setDashResults([]);
+      return;
+    }
+    const q = dashQuery.toLowerCase();
+    const results = [];
+    
+    // Search folders
+    activeOrg.infrastructure?.folders?.forEach(f => {
+      if (f.name.toLowerCase().includes(q)) results.push({ type: 'Folder', name: f.name, sub: f.isPublic ? 'Public' : 'Protected', icon: <Folder size={16}/> });
+    });
+
+    // Search databases
+    activeOrg.infrastructure?.databases?.forEach(d => {
+      if (d.name.toLowerCase().includes(q)) results.push({ type: 'Database', name: d.name, sub: d.type, icon: <Database size={16}/> });
+    });
+
+    // Search users
+    activeOrg.users?.forEach(u => {
+      if (u.name.toLowerCase().includes(q)) results.push({ type: 'User', name: u.name, sub: u.role, icon: <Users size={16}/> });
+    });
+
+    setDashResults(results);
+  }, [dashQuery, activeOrg]);
+
   return (
     <div className="flex-grow flex flex-col">
       <header className="fixed top-0 w-full z-50 border-b border-slate-200 dark:border-surface-border bg-white dark:bg-background-dark px-6 py-4 flex items-center justify-between gap-6">
@@ -491,10 +520,28 @@ function DashboardShell({ activeOrg, currentView, setCurrentView, user, requests
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
             <input 
                 type="text" 
-                placeholder="Search resources..." 
+                value={dashQuery}
+                onChange={(e) => setDashQuery(e.target.value)}
+                placeholder="Search resources, users..." 
                 className="w-full h-10 pl-10 pr-4 rounded-xl border border-slate-200 dark:border-surface-border bg-slate-50 dark:bg-slate-900/50 text-xs font-bold focus:ring-2 focus:ring-primary outline-none transition-all dark:text-white"
-                onKeyDown={(e) => e.key === 'Enter' && addToast(`Searching for '${e.target.value}'...`, 'info')}
             />
+            {dashQuery.length >= 2 && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-surface-dark border border-slate-200 dark:border-surface-border rounded-2xl shadow-xl overflow-hidden z-50 animate-fade-in">
+                    {dashResults.length > 0 ? (
+                        dashResults.map((res, i) => (
+                            <button key={i} onClick={() => { addToast(`Opened ${res.name}`, 'info'); setDashQuery(''); }} className="w-full p-3 hover:bg-slate-50 dark:hover:bg-background-dark flex items-center gap-3 text-left border-b border-slate-100 dark:border-surface-border/50 last:border-0 transition-all">
+                                <div className="size-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">{res.icon}</div>
+                                <div className="flex-1">
+                                    <h4 className="text-xs font-bold dark:text-white">{res.name}</h4>
+                                    <p className="text-[8px] font-black text-slate-400 uppercase">{res.sub}</p>
+                                </div>
+                            </button>
+                        ))
+                    ) : (
+                        <div className="p-4 text-center text-[10px] text-slate-400 font-bold uppercase">No resources found</div>
+                    )}
+                </div>
+            )}
           </div>
 
           <div className="flex items-center gap-4">
